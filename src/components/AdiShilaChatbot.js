@@ -145,8 +145,8 @@ export default function AdiShilaChatbot() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_0.85fr]">
-        <div className="adi-chat-panel rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 flex flex-col min-h-[520px] md:min-h-[700px] w-full max-w-full">
-          <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
+        <div className="adi-chat-panel rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 flex flex-col min-h-[820px] md:min-h-[700px] w-full max-w-full">
+          <div className="flex flex-col gap-4 flex-1 min-h-80 overflow-hidden">
             <div className="space-y-2 flex-shrink-0">
               <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">Ask your question</h2>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -154,21 +154,20 @@ export default function AdiShilaChatbot() {
               </p>
             </div>
 
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 flex-shrink-0">
+            <div className="grid gap-3 grid-cols-2 max-h-[22rem] overflow-y-auto pr-1 sm:grid-cols-2">
               {quickPrompts.map((prompt) => (
                 <button
                   key={prompt}
                   type="button"
                   onClick={() => handleQuickPrompt(prompt)}
-                  className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left text-sm text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-700 dark:hover:bg-zinc-800"
+                  className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-3 text-left text-sm text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-700 dark:hover:bg-zinc-800"
                 >
                   {prompt}
                 </button>
               ))}
             </div>
-
-            {/* Chat History Area */}
-            <div className="mt-4 space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 pb-2">
+            <h3 className="mt-4 text-lg font-semibold text-zinc-950 dark:text-zinc-50">Chat</h3>
+            <div className="mt-4 space-y-4 overflow-y-auto flex-1 min-h-50 pr-2 pb-2 scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent dark:scrollbar-thumb-zinc-700">
               {messages.map((item, index) => (
                 <div
                   key={`${item.role}-${index}`}
