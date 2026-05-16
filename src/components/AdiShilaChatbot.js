@@ -39,8 +39,10 @@ export default function AdiShilaChatbot() {
         const parsedLead = JSON.parse(storedLead);
         // Only load it if there is actual data inside
         if (parsedLead.name || parsedLead.email || parsedLead.interest) {
-          setLead(parsedLead);
-          setLeadSaved(true);
+          setTimeout(() => {
+            setLead(parsedLead);
+            setLeadSaved(true);
+          }, 0);
         }
       } catch (err) {
         console.error("Failed to parse lead from local storage", err);
