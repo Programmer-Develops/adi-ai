@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 
 const initialMessages = [
   {
@@ -24,11 +25,12 @@ export default function AdiShilaChatbot() {
   const [leadSaved, setLeadSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   const messagesEndRef = useRef(null);
 
   const canSend = input.trim().length > 0;
-  const canSaveLead = lead.name.trim() && lead.email.trim() && lead.interest.trim();
+  const canSaveLead =
+    lead.name.trim() && lead.email.trim() && lead.interest.trim();
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -69,8 +71,14 @@ export default function AdiShilaChatbot() {
     setInput("");
     setIsLoading(true);
 
-    const assistantText = await sendMessageToApi({ messages: nextMessages, lead });
-    setMessages((prev) => [...prev, { role: "assistant", text: assistantText }]);
+    const assistantText = await sendMessageToApi({
+      messages: nextMessages,
+      lead,
+    });
+    setMessages((prev) => [
+      ...prev,
+      { role: "assistant", text: assistantText },
+    ]);
     setIsLoading(false);
   };
 
@@ -81,8 +89,14 @@ export default function AdiShilaChatbot() {
     setMessages(nextMessages);
     setIsLoading(true);
 
-    const assistantText = await sendMessageToApi({ messages: nextMessages, lead });
-    setMessages((prev) => [...prev, { role: "assistant", text: assistantText }]);
+    const assistantText = await sendMessageToApi({
+      messages: nextMessages,
+      lead,
+    });
+    setMessages((prev) => [
+      ...prev,
+      { role: "assistant", text: assistantText },
+    ]);
     setIsLoading(false);
   };
 
@@ -98,8 +112,9 @@ export default function AdiShilaChatbot() {
   };
 
   const leadPreview = useMemo(
-    () => `${lead.name ? `${lead.name} · ` : ""}${lead.email ? `${lead.email} · ` : ""}${lead.interest}`,
-    [lead]
+    () =>
+      `${lead.name ? `${lead.name} · ` : ""}${lead.email ? `${lead.email} · ` : ""}${lead.interest}`,
+    [lead],
   );
 
   return (
@@ -107,12 +122,16 @@ export default function AdiShilaChatbot() {
       <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-lg shadow-zinc-100/50 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-zinc-500">AdiShila Support</p>
+            <p className="text-sm uppercase tracking-[0.24em] text-zinc-500">
+              AdiShila Support
+            </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-4xl">
               AI Customer Support + FAQ Chatbot
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-600 dark:text-zinc-300">
-              Ask questions about AdiShila shungite products, EMF protection, Vastu, pricing, and shipping. Capture lead info with name, email, and interest all in one place.
+              Ask questions about AdiShila shungite products, EMF protection,
+              Vastu, pricing, and shipping. Capture lead info with name, email,
+              and interest all in one place.
             </p>
           </div>
           <div className="rounded-3xl bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
@@ -125,9 +144,12 @@ export default function AdiShilaChatbot() {
         <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 flex flex-col h-[700px]">
           <div className="flex flex-col gap-4 flex-1 overflow-hidden">
             <div className="space-y-2 flex-shrink-0">
-              <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">Ask your question</h2>
+              <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">
+                Ask your question
+              </h2>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Start a conversation about products, EMF, Vastu, pricing, shipping, or lead capture.
+                Start a conversation about products, EMF, Vastu, pricing,
+                shipping, or lead capture.
               </p>
             </div>
 
@@ -158,7 +180,47 @@ export default function AdiShilaChatbot() {
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
                     {item.role === "assistant" ? "AdiShila Bot" : "You"}
                   </div>
-                  <p className="mt-2 whitespace-pre-line text-sm leading-7">{item.text}</p>
+                  <div className="mt-2 text-sm leading-7 text-zinc-800 dark:text-zinc-200">
+                    <ReactMarkdown
+                      components={{
+                        // Style bold text
+                        strong: ({ node, ...props }) => (
+                          <span
+                            className="font-bold text-zinc-950 dark:text-white"
+                            {...props}
+                          />
+                        ),
+                        // Style paragraphs
+                        p: ({ node, ...props }) => (
+                          <p className="mb-3 last:mb-0" {...props} />
+                        ),
+                        // Style unordered lists (bullet points)
+                        ul: ({ node, ...props }) => (
+                          <ul
+                            className="list-disc pl-5 mb-3 space-y-1"
+                            {...props}
+                          />
+                        ),
+                        // Style ordered lists (numbered)
+                        ol: ({ node, ...props }) => (
+                          <ol
+                            className="list-decimal pl-5 mb-3 space-y-1"
+                            {...props}
+                          />
+                        ),
+                        // Style list items
+                        li: ({ node, ...props }) => (
+                          <li className="" {...props} />
+                        ),
+                        // Style italics
+                        em: ({ node, ...props }) => (
+                          <span className="italic" {...props} />
+                        ),
+                      }}
+                    >
+                      {item.text}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               ))}
 
@@ -212,9 +274,12 @@ export default function AdiShilaChatbot() {
         <aside className="rounded-3xl border border-zinc-200 bg-zinc-50 p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">Lead Capture</h3>
+              <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                Lead Capture
+              </h3>
               <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-                Capture customer details and interest. This section stores the lead locally for quick follow-up.
+                Capture customer details and interest. This section stores the
+                lead locally for quick follow-up.
               </p>
             </div>
             <form className="space-y-4" onSubmit={handleLeadSubmit}>
@@ -223,7 +288,9 @@ export default function AdiShilaChatbot() {
                 <input
                   type="text"
                   value={lead.name}
-                  onChange={(event) => handleLeadChange("name", event.target.value)}
+                  onChange={(event) =>
+                    handleLeadChange("name", event.target.value)
+                  }
                   placeholder="Full name"
                   className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
                 />
@@ -233,7 +300,9 @@ export default function AdiShilaChatbot() {
                 <input
                   type="email"
                   value={lead.email}
-                  onChange={(event) => handleLeadChange("email", event.target.value)}
+                  onChange={(event) =>
+                    handleLeadChange("email", event.target.value)
+                  }
                   placeholder="you@example.com"
                   className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
                 />
@@ -243,7 +312,9 @@ export default function AdiShilaChatbot() {
                 <input
                   type="text"
                   value={lead.interest}
-                  onChange={(event) => handleLeadChange("interest", event.target.value)}
+                  onChange={(event) =>
+                    handleLeadChange("interest", event.target.value)
+                  }
                   placeholder="Product, EMF protection, Vastu..."
                   className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
                 />
