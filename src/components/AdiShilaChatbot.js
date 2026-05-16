@@ -126,8 +126,8 @@ export default function AdiShilaChatbot() {
   );
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10 sm:px-8">
-      <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-lg shadow-zinc-100/50 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none">
+    <section className="adi-mobile-shell mx-auto flex w-full max-w-6xl flex-col gap-8 px-0 py-8 sm:px-6 sm:py-10">
+      <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-lg shadow-zinc-100/50 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none sm:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm uppercase tracking-[0.24em] text-zinc-500">AdiShila Support</p>
@@ -145,8 +145,8 @@ export default function AdiShilaChatbot() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_0.85fr]">
-        <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 flex flex-col h-[700px]">
-          <div className="flex flex-col gap-4 flex-1 overflow-hidden">
+        <div className="adi-chat-panel rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 flex flex-col min-h-[520px] md:min-h-[700px] w-full max-w-full">
+          <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
             <div className="space-y-2 flex-shrink-0">
               <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">Ask your question</h2>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -154,7 +154,7 @@ export default function AdiShilaChatbot() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 flex-shrink-0">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 flex-shrink-0">
               {quickPrompts.map((prompt) => (
                 <button
                   key={prompt}
@@ -168,7 +168,7 @@ export default function AdiShilaChatbot() {
             </div>
 
             {/* Chat History Area */}
-            <div className="mt-4 space-y-4 overflow-y-auto flex-1 pr-2 pb-2">
+            <div className="mt-4 space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 pb-2">
               {messages.map((item, index) => (
                 <div
                   key={`${item.role}-${index}`}
@@ -242,7 +242,7 @@ export default function AdiShilaChatbot() {
                 type="button"
                 onClick={handleSend}
                 disabled={!canSend || isLoading}
-                className="inline-flex h-14 items-center justify-center rounded-3xl bg-zinc-950 px-6 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200 dark:disabled:bg-zinc-700"
+                className="inline-flex h-14 w-full items-center justify-center rounded-3xl bg-zinc-950 px-6 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200 dark:disabled:bg-zinc-700 sm:w-auto"
               >
                 Send
               </button>

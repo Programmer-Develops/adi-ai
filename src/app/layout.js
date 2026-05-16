@@ -14,6 +14,10 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "AdiShila Support Chatbot",
   description: "Live customer support chatbot for AdiShila shungite products, EMF protection, Vastu, pricing, shipping, and lead capture.",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+  },
 };
 
 export default function RootLayout({ children }) {
