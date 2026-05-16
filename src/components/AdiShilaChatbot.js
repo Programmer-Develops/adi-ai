@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 
 const initialMessages = [
   {
@@ -24,17 +24,19 @@ export default function AdiShilaChatbot() {
   const [leadSaved, setLeadSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  const messagesEndRef = useRef(null);
 
   const canSend = input.trim().length > 0;
   const canSaveLead = lead.name.trim() && lead.email.trim() && lead.interest.trim();
 
-  const addAssistantMessage = (text) => {
-    setMessages((prev) => [...prev, { role: "assistant", text }]);
-  };
+  // Auto-scroll to latest message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
 
   const sendMessageToApi = async (payload) => {
     setError(null);
-
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -51,6 +53,7 @@ export default function AdiShilaChatbot() {
 
       return data.answer;
     } catch (err) {
+      console.error(err);
       setError(err.message);
       return "Sorry, I couldn't connect to the AI service. Please try again later.";
     }
@@ -90,9 +93,7 @@ export default function AdiShilaChatbot() {
 
   const handleLeadSubmit = (event) => {
     event.preventDefault();
-    if (!canSaveLead) {
-      return;
-    }
+    if (!canSaveLead) return;
     setLeadSaved(true);
   };
 
@@ -121,16 +122,16 @@ export default function AdiShilaChatbot() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_0.85fr]">
-        <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="flex flex-col gap-4">
-            <div className="space-y-2">
+        <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 flex flex-col h-[700px]">
+          <div className="flex flex-col gap-4 flex-1 overflow-hidden">
+            <div className="space-y-2 flex-shrink-0">
               <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">Ask your question</h2>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Start a conversation about products, EMF, Vastu, pricing, shipping, or lead capture. Use quick prompts for instant guidance.
+                Start a conversation about products, EMF, Vastu, pricing, shipping, or lead capture.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 flex-shrink-0">
               {quickPrompts.map((prompt) => (
                 <button
                   key={prompt}
@@ -143,7 +144,8 @@ export default function AdiShilaChatbot() {
               ))}
             </div>
 
-            <div className="mt-4 space-y-4">
+            {/* Chat History Area */}
+            <div className="mt-4 space-y-4 overflow-y-auto flex-1 pr-2 pb-2">
               {messages.map((item, index) => (
                 <div
                   key={`${item.role}-${index}`}
@@ -165,18 +167,19 @@ export default function AdiShilaChatbot() {
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
                     AdiShila Bot
                   </div>
-                  <p className="mt-2">Thinking... please wait.</p>
+                  <p className="mt-2 animate-pulse">Thinking... please wait.</p>
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             {error && (
-              <div className="rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-950/30 dark:text-rose-200">
+              <div className="rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-950/30 dark:text-rose-200 flex-shrink-0">
                 {error}
               </div>
             )}
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="pt-4 flex flex-col gap-3 sm:flex-row sm:items-center flex-shrink-0 border-t border-zinc-100 dark:border-zinc-800">
               <label className="sr-only" htmlFor="chat-input">
                 Type your question
               </label>
@@ -190,7 +193,7 @@ export default function AdiShilaChatbot() {
                     handleSend();
                   }
                 }}
-                placeholder="Ask about AdiShila products, EMF, Vastu, pricing, or shipping..."
+                placeholder="Ask about AdiShila products, EMF, Vastu..."
                 className="min-h-[54px] flex-1 rounded-3xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
               />
               <button
@@ -205,12 +208,13 @@ export default function AdiShilaChatbot() {
           </div>
         </div>
 
+        {/* Lead Capture Aside remains unchanged */}
         <aside className="rounded-3xl border border-zinc-200 bg-zinc-50 p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">Lead Capture</h3>
               <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-                Capture customer details and interest. This section stores the lead locally for quick follow-up and reviewing product interest.
+                Capture customer details and interest. This section stores the lead locally for quick follow-up.
               </p>
             </div>
             <form className="space-y-4" onSubmit={handleLeadSubmit}>
@@ -240,7 +244,7 @@ export default function AdiShilaChatbot() {
                   type="text"
                   value={lead.interest}
                   onChange={(event) => handleLeadChange("interest", event.target.value)}
-                  placeholder="Product, EMF protection, Vastu, shipping"
+                  placeholder="Product, EMF protection, Vastu..."
                   className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
                 />
               </label>
@@ -259,7 +263,7 @@ export default function AdiShilaChatbot() {
               </p>
               {leadSaved && (
                 <p className="mt-3 rounded-2xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
-                  Lead saved locally. Use the chat to ask questions or add more info.
+                  Lead saved. The bot will use this context in your chat.
                 </p>
               )}
             </div>
