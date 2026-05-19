@@ -391,7 +391,7 @@ export default function AdiShilaChatbot() {
                     }
                   }}
                   placeholder="Ask a question..."
-                  className="w-full max-h-32 min-h-[48px] resize-none rounded-2xl border border-zinc-200 bg-zinc-50 pl-4 pr-12 py-3.5 text-sm outline-none focus:border-zinc-400 focus:bg-white dark:border-zinc-800 dark:bg-zinc-900 dark:focus:border-zinc-600 scrollbar-thin"
+                  className="w-full max-h-32 min-h-[48px] resize-none rounded-2xl border border-zinc-200 bg-zinc-50 pl-4 pr-12 py-3.5 text-sm outline-none focus:border-zinc-400 focus:bg-grey dark:border-zinc-800 dark:bg-zinc-900 dark:focus:border-zinc-600 scrollbar-thin"
                   rows={1}
                 />
                 <button
