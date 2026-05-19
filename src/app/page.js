@@ -2,7 +2,7 @@ import AdiShilaChatbot from "../components/AdiShilaChatbot";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
+    <main className="px-4 py-8">
       <AdiShilaChatbot />
     </main>
   );

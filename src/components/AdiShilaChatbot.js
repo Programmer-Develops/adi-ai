@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 
 const initialMessages = [
   {
     role: "assistant",
-    text: "Welcome to AdiShila Support! Ask me about shungite products, EMF protection, Vastu, pricing, shipping, or share your interest and I will help you right away.",
+    text: "Welcome to AdiShila Support! Ask me about shungite products, EMF protection, Vastu, pricing, and shipping. Share your interest and I will help you right away.",
+    time: new Date().toISOString(),
   },
 ];
 
@@ -25,6 +26,7 @@ export default function AdiShilaChatbot() {
   const [leadSaved, setLeadSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
   
   const messagesEndRef = useRef(null);
 
@@ -66,12 +68,45 @@ export default function AdiShilaChatbot() {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
       if (!response.ok) {
+        // try to read JSON error
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (err) {
+          /* ignore */
+        }
         throw new Error(data?.error || "Unable to reach the AI service.");
       }
 
-      return data.answer;
+      // If the response is a streaming text body, read it progressively and append to the assistant message.
+      if (response.body) {
+        // Add an empty assistant message which we will update as chunks arrive
+        setMessages((prev) => [...prev, { role: "assistant", text: "", time: new Date().toISOString() }]);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false;
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+          if (value) {
+            const chunk = decoder.decode(value);
+            setMessages((prev) => {
+              const copy = [...prev];
+              const last = copy[copy.length - 1] || { role: "assistant", text: "" };
+              copy[copy.length - 1] = { ...last, text: (last.text || "") + chunk };
+              return copy;
+            });
+          }
+        }
+
+        return null;
+      }
+
+      // Fallback: if no body stream, return full text
+      const text = await response.text();
+      return text;
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -83,26 +118,31 @@ export default function AdiShilaChatbot() {
     if (!canSend || isLoading) return;
 
     const userMessage = input.trim();
-    const nextMessages = [...messages, { role: "user", text: userMessage }];
+    const nextMessages = [...messages, { role: "user", text: userMessage, time: new Date().toISOString() }];
 
     setMessages(nextMessages);
     setInput("");
     setIsLoading(true);
 
-    const assistantText = await sendMessageToApi({ messages: nextMessages, lead });
-    setMessages((prev) => [...prev, { role: "assistant", text: assistantText }]);
+    const maybeText = await sendMessageToApi({ messages: nextMessages, lead });
+    // If the API returned an immediate string (non-streaming or error), append it.
+    if (typeof maybeText === "string" && maybeText) {
+      setMessages((prev) => [...prev, { role: "assistant", text: maybeText, time: new Date().toISOString() }] );
+    }
     setIsLoading(false);
   };
 
   const handleQuickPrompt = async (prompt) => {
     if (isLoading) return;
 
-    const nextMessages = [...messages, { role: "user", text: prompt }];
+    const nextMessages = [...messages, { role: "user", text: prompt, time: new Date().toISOString() }];
     setMessages(nextMessages);
     setIsLoading(true);
 
-    const assistantText = await sendMessageToApi({ messages: nextMessages, lead });
-    setMessages((prev) => [...prev, { role: "assistant", text: assistantText }]);
+    const maybeText = await sendMessageToApi({ messages: nextMessages, lead });
+    if (typeof maybeText === "string" && maybeText) {
+      setMessages((prev) => [...prev, { role: "assistant", text: maybeText, time: new Date().toISOString() }] );
+    }
     setIsLoading(false);
   };
 
@@ -117,7 +157,26 @@ export default function AdiShilaChatbot() {
     
     // 2. SAVE TO LOCAL STORAGE ON SUBMIT
     localStorage.setItem("adishila_lead", JSON.stringify(lead));
-    setLeadSaved(true);
+
+    // 3. POST the lead to the centralized server endpoint which will forward to a webhook if configured
+    (async () => {
+      try {
+        const res = await fetch("/api/leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lead }),
+        });
+        if (!res.ok) {
+          console.error("Failed to save lead to server");
+          setLeadSaved(false);
+          return;
+        }
+        setLeadSaved(true);
+      } catch (err) {
+        console.error("Error sending lead to server:", err);
+        setLeadSaved(false);
+      }
+    })();
   };
 
   const leadPreview = useMemo(
@@ -125,48 +184,55 @@ export default function AdiShilaChatbot() {
     [lead]
   );
 
+  const validateEmail = (email) => {
+    if (!email) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const showToastMessage = useCallback((msg, duration = 3000) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), duration);
+  }, []);
+
+  const clearChat = useCallback(() => {
+    setMessages(initialMessages);
+    showToastMessage('Conversation cleared');
+  }, [showToastMessage]);
+
+  const exportTranscript = useCallback(() => {
+    const text = messages
+      .map((m) => `${m.role.toUpperCase()} [${new Date(m.time || Date.now()).toLocaleString()}]:\n${m.text}\n`)
+      .join('\n-----\n');
+    navigator.clipboard.writeText(text).then(() => showToastMessage('Transcript copied to clipboard'));
+  }, [messages, showToastMessage]);
+
   return (
-    <section className="adi-mobile-shell mx-auto flex w-full max-w-6xl flex-col gap-8 px-0 py-8 sm:px-6 sm:py-10">
-      <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-lg shadow-zinc-100/50 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none sm:p-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-zinc-500">AdiShila Support</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-4xl">
-              AI Customer Support + FAQ Chatbot
-            </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-600 dark:text-zinc-300">
-              Ask questions about AdiShila shungite products, EMF protection, Vastu, pricing, and shipping. Capture lead info with name, email, and interest all in one place.
-            </p>
-          </div>
-          <div className="rounded-3xl bg-zinc-100 p-4 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-            AI-powered responses with product support and lead context
-          </div>
+    <section className="adi-chat-widget mx-auto w-full max-w-4xl rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-lg shadow-zinc-100/60 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.26em] text-zinc-500 dark:text-zinc-400">AdiShila Support</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-3xl">
+            AI Support Chatbot
+          </h1>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+            Embeddable AI chat for product support, FAQs, and lead capture with a clean card-style layout.
+          </p>
+        </div>
+        <div className="rounded-3xl bg-zinc-100 p-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+          Customer support widget
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_0.85fr]">
         <div className="adi-chat-panel rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 flex flex-col min-h-[820px] md:min-h-[700px] w-full max-w-full">
           <div className="flex flex-col gap-4 flex-1 min-h-80 overflow-hidden">
-            <div className="space-y-2 flex-shrink-0">
+            {/* <div className="space-y-2 flex-shrink-0">
               <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">Ask your question</h2>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
                 Start a conversation about products, EMF, Vastu, pricing, shipping, or lead capture.
               </p>
-            </div>
+            </div> */}
 
-            <div className="grid gap-3 grid-cols-2 max-h-[22rem] overflow-y-auto pr-1 sm:grid-cols-2">
-              {quickPrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => handleQuickPrompt(prompt)}
-                  className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-3 text-left text-sm text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-700 dark:hover:bg-zinc-800"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-            <h3 className="mt-4 text-lg font-semibold text-zinc-950 dark:text-zinc-50">Chat</h3>
             <div className="mt-4 space-y-4 overflow-y-auto flex-1 min-h-50 pr-2 pb-2 scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent dark:scrollbar-thumb-zinc-700">
               {messages.map((item, index) => (
                 <div
@@ -196,6 +262,33 @@ export default function AdiShilaChatbot() {
                       >
                         {item.text}
                       </ReactMarkdown>
+                      {index === 0 && item.role === "assistant" && (
+                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                          {quickPrompts.map((prompt) => (
+                            <button
+                              key={prompt}
+                              type="button"
+                              onClick={() => handleQuickPrompt(prompt)}
+                              className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-left text-sm text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-700 dark:hover:bg-zinc-800"
+                            >
+                              {prompt}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {/* If the assistant used the guardrail refusal text, show a quick contact CTA */}
+                      {item.text && item.text.includes("I'm sorry — I can't assist with that request") && (
+                        <div className="mt-3 flex gap-2">
+                          <a
+                            href={`mailto:info@adishila.in?subject=Support%20request&body=${encodeURIComponent(
+                              `User question: ${messages.find(m => m.role === 'user')?.text || ''}\n\nLast bot message: ${item.text}`
+                            )}`}
+                            className="rounded-2xl bg-amber-100 px-3 py-2 text-xs text-amber-800"
+                          >
+                            Contact Support
+                          </a>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <p className="mt-2 whitespace-pre-line text-sm leading-7">{item.text}</p>

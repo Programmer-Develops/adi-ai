@@ -34,21 +34,20 @@ body {
 }
 
 @layer components {
-  .adi-mobile-shell {
+  .adi-chat-widget {
     width: 100%;
     max-width: 100%;
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding: 0;
   }
 
   .adi-chat-panel {
-    min-height: 52vh;
+    min-height: 46vh;
     max-height: calc(100vh - 220px);
   }
 
   @media (max-width: 640px) {
     .adi-chat-panel {
-      min-height: 44vh;
+      min-height: 40vh;
       max-height: calc(100vh - 200px);
     }
   }
