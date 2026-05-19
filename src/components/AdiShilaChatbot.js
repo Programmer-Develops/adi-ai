@@ -19,10 +19,21 @@ const quickPrompts = [
   "Pricing details",
 ];
 
+const interestOptions = [
+  "Kavach Shield OM",
+  "Vastu Dosh Pyramid",
+  "Rudra-Shila Raksha Mala",
+  "Amrit Jal Shuddhi Set",
+  "Shila Raksha Pendant OM",
+  "General Wholesale Inquiry",
+  "EMF Protection Info"
+];
+
 export default function AdiShilaChatbot() {
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState("");
-  const [lead, setLead] = useState({ name: "", email: "", interest: "" });
+  
+  const [lead, setLead] = useState({ name: "", email: "", interest: [] });
   const [leadSaved, setLeadSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -32,18 +43,21 @@ export default function AdiShilaChatbot() {
 
   const canSend = input.trim().length > 0;
 
-  // --- NEW: STRICT VALIDATION LOGIC ---
+  // --- STRICT VALIDATION LOGIC ---
   const validateEmail = (email) => {
     if (!email) return false;
-    // Strict email regex pattern
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  const isValidName = lead.name.trim().length >= 2; // Prevent 1-letter spam
-  const isValidInterest = lead.interest.trim().length >= 2; // Prevent 1-letter spam
-  const isValidEmail = validateEmail(lead.email);
+  const validateName = (name) => {
+    if (!name) return false;
+    return name.trim().length >= 3 && /^[A-Za-z\s]+$/.test(name);
+  };
 
-  // Button is only active if all fields are valid AND it hasn't been saved yet
+  const isValidName = validateName(lead.name);
+  const isValidEmail = validateEmail(lead.email);
+  const isValidInterest = Array.isArray(lead.interest) && lead.interest.length > 0; 
+
   const canSaveLead = isValidName && isValidEmail && isValidInterest && !leadSaved;
 
   // 1. LOAD FROM LOCAL STORAGE ON MOUNT
@@ -53,8 +67,14 @@ export default function AdiShilaChatbot() {
       try {
         const parsedLead = JSON.parse(storedLead);
         if (parsedLead.name || parsedLead.email || parsedLead.interest) {
+          
+          let loadedInterest = parsedLead.interest;
+          if (typeof loadedInterest === 'string') {
+            loadedInterest = loadedInterest ? loadedInterest.split(", ") : [];
+          }
+
           setTimeout(() => {
-            setLead(parsedLead);
+            setLead({ ...parsedLead, interest: loadedInterest || [] });
             setLeadSaved(true);
           }, 0);
         }
@@ -64,7 +84,6 @@ export default function AdiShilaChatbot() {
     }
   }, []); 
 
-  // Auto-scroll to latest message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
@@ -74,17 +93,13 @@ export default function AdiShilaChatbot() {
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         let data = null;
-        try {
-          data = await response.json();
-        } catch (err) {}
+        try { data = await response.json(); } catch (err) {}
         throw new Error(data?.error || "Unable to reach the AI service.");
       }
 
@@ -110,8 +125,7 @@ export default function AdiShilaChatbot() {
         return null;
       }
 
-      const text = await response.text();
-      return text;
+      return await response.text();
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -129,7 +143,11 @@ export default function AdiShilaChatbot() {
     setInput("");
     setIsLoading(true);
 
-    const maybeText = await sendMessageToApi({ messages: nextMessages, lead });
+    const maybeText = await sendMessageToApi({ 
+      messages: nextMessages, 
+      lead: { ...lead, interest: lead.interest.join(", ") } 
+    });
+    
     if (typeof maybeText === "string" && maybeText) {
       setMessages((prev) => [...prev, { role: "assistant", text: maybeText, time: new Date().toISOString() }] );
     }
@@ -143,7 +161,11 @@ export default function AdiShilaChatbot() {
     setMessages(nextMessages);
     setIsLoading(true);
 
-    const maybeText = await sendMessageToApi({ messages: nextMessages, lead });
+    const maybeText = await sendMessageToApi({ 
+      messages: nextMessages, 
+      lead: { ...lead, interest: lead.interest.join(", ") } 
+    });
+    
     if (typeof maybeText === "string" && maybeText) {
       setMessages((prev) => [...prev, { role: "assistant", text: maybeText, time: new Date().toISOString() }] );
     }
@@ -152,43 +174,65 @@ export default function AdiShilaChatbot() {
 
   const handleLeadChange = (field, value) => {
     setLead((current) => ({ ...current, [field]: value }));
-    // If they edit ANYTHING, unlock the save button by setting this to false
     setLeadSaved(false); 
+  };
+
+  const toggleInterest = (option) => {
+    setLeadSaved(false);
+    setLead((current) => {
+      const currentInterests = Array.isArray(current.interest) ? current.interest : [];
+      let newInterests;
+      
+      if (currentInterests.includes(option)) {
+        newInterests = currentInterests.filter(i => i !== option);
+      } else {
+        newInterests = [...currentInterests, option];
+      }
+      return { ...current, interest: newInterests };
+    });
   };
 
   const handleLeadSubmit = (event) => {
     event.preventDefault();
     if (!canSaveLead) return;
     
-    // 2. SAVE TO LOCAL STORAGE
-    localStorage.setItem("adishila_lead", JSON.stringify(lead));
+    const formattedLead = {
+      ...lead,
+      interest: lead.interest.join(", ")
+    };
 
-    // 3. POST TO SERVER
+    localStorage.setItem("adishila_lead", JSON.stringify(formattedLead));
+
     (async () => {
       try {
         const res = await fetch("/api/leads", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lead }),
+          body: JSON.stringify({ lead: formattedLead }),
         });
         if (!res.ok) {
-          console.error("Failed to save lead to server");
           setLeadSaved(false);
           return;
         }
-        // Lock the button successfully
         setLeadSaved(true);
       } catch (err) {
-        console.error("Error sending lead to server:", err);
         setLeadSaved(false);
       }
     })();
   };
 
-  const leadPreview = useMemo(
-    () => `${lead.name ? `${lead.name} · ` : ""}${lead.email ? `${lead.email} · ` : ""}${lead.interest}`,
-    [lead]
-  );
+  // NEW: Function to clear the saved lead from memory and state
+  const handleClearLead = () => {
+    localStorage.removeItem("adishila_lead");
+    setLead({ name: "", email: "", interest: [] });
+    setLeadSaved(false);
+    showToastMessage("Lead cleared successfully");
+  };
+
+  const leadPreview = useMemo(() => {
+    const interestStr = Array.isArray(lead.interest) ? lead.interest.join(", ") : lead.interest;
+    return `${lead.name ? `${lead.name} · ` : ""}${lead.email ? `${lead.email} · ` : ""}${interestStr}`;
+  }, [lead]);
 
   const showToastMessage = useCallback((msg, duration = 3000) => {
     setToast(msg);
@@ -201,7 +245,15 @@ export default function AdiShilaChatbot() {
   }, [showToastMessage]);
 
   return (
-    <section className="adi-chat-widget mx-auto w-full max-w-4xl rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-lg shadow-zinc-100/60 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none">
+    <section className="adi-chat-widget mx-auto w-full max-w-4xl rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-lg shadow-zinc-100/60 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none relative">
+      
+      {/* Toast Notification Overlay */}
+      {toast && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 rounded-full bg-zinc-900 px-4 py-2 text-sm text-white shadow-lg transition-all dark:bg-white dark:text-zinc-900">
+          {toast}
+        </div>
+      )}
+
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.26em] text-zinc-500 dark:text-zinc-400">AdiShila Support</p>
@@ -336,6 +388,7 @@ export default function AdiShilaChatbot() {
               </p>
             </div>
             <form className="space-y-4" onSubmit={handleLeadSubmit}>
+              
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-200">
                 Name
                 <input
@@ -343,8 +396,15 @@ export default function AdiShilaChatbot() {
                   value={lead.name}
                   onChange={(event) => handleLeadChange("name", event.target.value)}
                   placeholder="Full name"
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
+                  className={`mt-2 w-full rounded-2xl border bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:ring-2 dark:bg-zinc-950 dark:text-zinc-100 ${
+                    lead.name.length > 0 && !isValidName 
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-rose-200 dark:border-rose-600 dark:focus:ring-rose-900" 
+                    : "border-zinc-200 focus:border-zinc-400 focus:ring-zinc-200 dark:border-zinc-800 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
+                  }`}
                 />
+                {lead.name.length > 0 && !isValidName && (
+                  <span className="text-xs text-rose-500 mt-1 block">Please enter a valid name (letters only).</span>
+                )}
               </label>
               
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-200">
@@ -354,29 +414,40 @@ export default function AdiShilaChatbot() {
                   value={lead.email}
                   onChange={(event) => handleLeadChange("email", event.target.value)}
                   placeholder="you@example.com"
-                  // Visual feedback if they type an invalid email
                   className={`mt-2 w-full rounded-2xl border bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:ring-2 dark:bg-zinc-950 dark:text-zinc-100 ${
                     lead.email.length > 0 && !isValidEmail 
                     ? "border-rose-400 focus:border-rose-500 focus:ring-rose-200 dark:border-rose-600 dark:focus:ring-rose-900" 
                     : "border-zinc-200 focus:border-zinc-400 focus:ring-zinc-200 dark:border-zinc-800 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
                   }`}
                 />
-                {/* Helper text for invalid email */}
                 {lead.email.length > 0 && !isValidEmail && (
                   <span className="text-xs text-rose-500 mt-1 block">Please enter a valid email address.</span>
                 )}
               </label>
 
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-200">
-                Interest
-                <input
-                  type="text"
-                  value={lead.interest}
-                  onChange={(event) => handleLeadChange("interest", event.target.value)}
-                  placeholder="Product, EMF protection, Vastu..."
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
-                />
-              </label>
+              <div className="block text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                Interests (Select all that apply)
+                <div className={`mt-2 flex flex-col gap-3 rounded-2xl border bg-white px-4 py-3 text-sm transition dark:bg-zinc-950 max-h-48 overflow-y-auto ${
+                    Array.isArray(lead.interest) && lead.interest.length === 0 && lead.name.length > 0 
+                    ? "border-rose-400 dark:border-rose-600" 
+                    : "border-zinc-200 dark:border-zinc-800"
+                }`}>
+                  {interestOptions.map((option) => (
+                    <label key={option} className="flex items-start gap-3 cursor-pointer text-zinc-800 dark:text-zinc-200 font-normal">
+                      <input
+                        type="checkbox"
+                        checked={Array.isArray(lead.interest) && lead.interest.includes(option)}
+                        onChange={() => toggleInterest(option)}
+                        className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:checked:bg-zinc-100"
+                      />
+                      <span className="leading-tight">{option}</span>
+                    </label>
+                  ))}
+                </div>
+                {Array.isArray(lead.interest) && lead.interest.length === 0 && lead.name.length > 0 && (
+                  <span className="text-xs text-rose-500 mt-1 block">Please select at least one interest.</span>
+                )}
+              </div>
               
               <button
                 type="submit"
@@ -392,8 +463,19 @@ export default function AdiShilaChatbot() {
             </form>
 
             <div className="rounded-3xl bg-white p-4 text-sm text-zinc-700 shadow-sm dark:bg-zinc-950 dark:text-zinc-200">
-              <p className="font-semibold">Last saved lead</p>
-              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              {/* NEW: Clear button added to the header */}
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-semibold">Last saved lead</p>
+                {(lead.name || lead.email || (Array.isArray(lead.interest) && lead.interest.length > 0)) && (
+                  <button 
+                    onClick={handleClearLead}
+                    className="text-xs font-medium text-rose-500 hover:text-rose-600 transition dark:text-rose-400 dark:hover:text-rose-300"
+                  >
+                    Clear Lead
+                  </button>
+                )}
+              </div>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 break-words">
                 {leadPreview || "No lead captured yet."}
               </p>
             </div>
