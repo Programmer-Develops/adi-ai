@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { db } from "../../../lib/firebase"; // Assumes your Firebase config is still here from the Gobrics Assistant
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export async function POST(request) {
   try {
@@ -12,22 +10,30 @@ export async function POST(request) {
       return NextResponse.json({ error: "Lead payload must include at least one contact field." }, { status: 400 });
     }
 
-    // FEEDBACK 2: PUSH LEAD DIRECTLY TO CENTRALIZED FIREBASE DATABASE
-    const docRef = await addDoc(collection(db, "adishila_leads"), {
-      name: lead.name || "Unknown",
-      email: lead.email || "No Email",
-      interest: lead.interest || "General",
-      source: "AdiShila Support Chatbot",
-      status: "New",
-      createdAt: serverTimestamp()
+    const scriptUrl = process.env.LEAD_WEBHOOK_URL;
+
+    if (!scriptUrl) {
+      console.error("Missing LEAD_WEBHOOK_URL in environment variables.");
+      return NextResponse.json({ error: "Webhook URL not configured." }, { status: 500 });
+    }
+
+    // Forward the lead data to the Google Sheets Apps Script Webhook
+    const response = await fetch(scriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lead }),
     });
 
-    console.log("Lead successfully saved to Firebase with ID:", docRef.id);
+    if (!response.ok) {
+      throw new Error("Failed to forward lead to Google Sheets");
+    }
 
-    return NextResponse.json({ status: "ok", id: docRef.id });
+    console.log("Lead successfully routed to Google Sheets:", lead.name);
+
+    return NextResponse.json({ status: "ok", message: "Lead saved to Google Sheets" });
 
   } catch (err) {
-    console.error("Error in /api/leads saving to Firebase:", err);
-    return NextResponse.json({ error: "Failed to route lead to centralized database." }, { status: 500 });
+    console.error("Error in /api/leads saving to Sheets:", err);
+    return NextResponse.json({ error: "Failed to route lead." }, { status: 500 });
   }
 }
