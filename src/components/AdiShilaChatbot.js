@@ -31,15 +31,27 @@ export default function AdiShilaChatbot() {
   const messagesEndRef = useRef(null);
 
   const canSend = input.trim().length > 0;
-  const canSaveLead = lead.name.trim() && lead.email.trim() && lead.interest.trim();
 
-  // 1. LOAD FROM LOCAL STORAGE ON MOUNT (after hydration)
+  // --- NEW: STRICT VALIDATION LOGIC ---
+  const validateEmail = (email) => {
+    if (!email) return false;
+    // Strict email regex pattern
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const isValidName = lead.name.trim().length >= 2; // Prevent 1-letter spam
+  const isValidInterest = lead.interest.trim().length >= 2; // Prevent 1-letter spam
+  const isValidEmail = validateEmail(lead.email);
+
+  // Button is only active if all fields are valid AND it hasn't been saved yet
+  const canSaveLead = isValidName && isValidEmail && isValidInterest && !leadSaved;
+
+  // 1. LOAD FROM LOCAL STORAGE ON MOUNT
   useEffect(() => {
     const storedLead = localStorage.getItem("adishila_lead");
     if (storedLead) {
       try {
         const parsedLead = JSON.parse(storedLead);
-        // Only load it if there is actual data inside
         if (parsedLead.name || parsedLead.email || parsedLead.interest) {
           setTimeout(() => {
             setLead(parsedLead);
@@ -50,7 +62,7 @@ export default function AdiShilaChatbot() {
         console.error("Failed to parse lead from local storage", err);
       }
     }
-  }, []); // Empty dependency array: runs once after hydration
+  }, []); 
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -69,19 +81,14 @@ export default function AdiShilaChatbot() {
       });
 
       if (!response.ok) {
-        // try to read JSON error
         let data = null;
         try {
           data = await response.json();
-        } catch (err) {
-          /* ignore */
-        }
+        } catch (err) {}
         throw new Error(data?.error || "Unable to reach the AI service.");
       }
 
-      // If the response is a streaming text body, read it progressively and append to the assistant message.
       if (response.body) {
-        // Add an empty assistant message which we will update as chunks arrive
         setMessages((prev) => [...prev, { role: "assistant", text: "", time: new Date().toISOString() }]);
 
         const reader = response.body.getReader();
@@ -100,11 +107,9 @@ export default function AdiShilaChatbot() {
             });
           }
         }
-
         return null;
       }
 
-      // Fallback: if no body stream, return full text
       const text = await response.text();
       return text;
     } catch (err) {
@@ -125,7 +130,6 @@ export default function AdiShilaChatbot() {
     setIsLoading(true);
 
     const maybeText = await sendMessageToApi({ messages: nextMessages, lead });
-    // If the API returned an immediate string (non-streaming or error), append it.
     if (typeof maybeText === "string" && maybeText) {
       setMessages((prev) => [...prev, { role: "assistant", text: maybeText, time: new Date().toISOString() }] );
     }
@@ -148,17 +152,18 @@ export default function AdiShilaChatbot() {
 
   const handleLeadChange = (field, value) => {
     setLead((current) => ({ ...current, [field]: value }));
-    setLeadSaved(false); // They changed something, so it's no longer saved
+    // If they edit ANYTHING, unlock the save button by setting this to false
+    setLeadSaved(false); 
   };
 
   const handleLeadSubmit = (event) => {
     event.preventDefault();
     if (!canSaveLead) return;
     
-    // 2. SAVE TO LOCAL STORAGE ON SUBMIT
+    // 2. SAVE TO LOCAL STORAGE
     localStorage.setItem("adishila_lead", JSON.stringify(lead));
 
-    // 3. POST the lead to the centralized server endpoint which will forward to a webhook if configured
+    // 3. POST TO SERVER
     (async () => {
       try {
         const res = await fetch("/api/leads", {
@@ -171,6 +176,7 @@ export default function AdiShilaChatbot() {
           setLeadSaved(false);
           return;
         }
+        // Lock the button successfully
         setLeadSaved(true);
       } catch (err) {
         console.error("Error sending lead to server:", err);
@@ -184,11 +190,6 @@ export default function AdiShilaChatbot() {
     [lead]
   );
 
-  const validateEmail = (email) => {
-    if (!email) return false;
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
-
   const showToastMessage = useCallback((msg, duration = 3000) => {
     setToast(msg);
     setTimeout(() => setToast(null), duration);
@@ -198,13 +199,6 @@ export default function AdiShilaChatbot() {
     setMessages(initialMessages);
     showToastMessage('Conversation cleared');
   }, [showToastMessage]);
-
-  const exportTranscript = useCallback(() => {
-    const text = messages
-      .map((m) => `${m.role.toUpperCase()} [${new Date(m.time || Date.now()).toLocaleString()}]:\n${m.text}\n`)
-      .join('\n-----\n');
-    navigator.clipboard.writeText(text).then(() => showToastMessage('Transcript copied to clipboard'));
-  }, [messages, showToastMessage]);
 
   return (
     <section className="adi-chat-widget mx-auto w-full max-w-4xl rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-lg shadow-zinc-100/60 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none">
@@ -226,13 +220,6 @@ export default function AdiShilaChatbot() {
       <div className="grid gap-6 lg:grid-cols-[1.4fr_0.85fr]">
         <div className="adi-chat-panel rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 flex flex-col min-h-[820px] md:min-h-[700px] w-full max-w-full">
           <div className="flex flex-col gap-4 flex-1 min-h-80 overflow-hidden">
-            {/* <div className="space-y-2 flex-shrink-0">
-              <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">Ask your question</h2>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Start a conversation about products, EMF, Vastu, pricing, shipping, or lead capture.
-              </p>
-            </div> */}
-
             <div className="mt-4 space-y-4 overflow-y-auto flex-1 min-h-50 pr-2 pb-2 scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent dark:scrollbar-thumb-zinc-700">
               {messages.map((item, index) => (
                 <div
@@ -247,7 +234,6 @@ export default function AdiShilaChatbot() {
                     {item.role === "assistant" ? "AdiShila Bot" : "You"}
                   </div>
                   
-                  {/* 3. REACT MARKDOWN IMPLEMENTATION */}
                   {item.role === "assistant" ? (
                     <div className="mt-2 text-sm leading-7 text-zinc-800 dark:text-zinc-200">
                       <ReactMarkdown
@@ -276,7 +262,6 @@ export default function AdiShilaChatbot() {
                           ))}
                         </div>
                       )}
-                      {/* If the assistant used the guardrail refusal text, show a quick contact CTA */}
                       {item.text && item.text.includes("I'm sorry — I can't assist with that request") && (
                         <div className="mt-3 flex gap-2">
                           <a
@@ -361,6 +346,7 @@ export default function AdiShilaChatbot() {
                   className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
                 />
               </label>
+              
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-200">
                 Email
                 <input
@@ -368,9 +354,19 @@ export default function AdiShilaChatbot() {
                   value={lead.email}
                   onChange={(event) => handleLeadChange("email", event.target.value)}
                   placeholder="you@example.com"
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
+                  // Visual feedback if they type an invalid email
+                  className={`mt-2 w-full rounded-2xl border bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:ring-2 dark:bg-zinc-950 dark:text-zinc-100 ${
+                    lead.email.length > 0 && !isValidEmail 
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-rose-200 dark:border-rose-600 dark:focus:ring-rose-900" 
+                    : "border-zinc-200 focus:border-zinc-400 focus:ring-zinc-200 dark:border-zinc-800 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
+                  }`}
                 />
+                {/* Helper text for invalid email */}
+                {lead.email.length > 0 && !isValidEmail && (
+                  <span className="text-xs text-rose-500 mt-1 block">Please enter a valid email address.</span>
+                )}
               </label>
+
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-200">
                 Interest
                 <input
@@ -381,11 +377,17 @@ export default function AdiShilaChatbot() {
                   className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-900"
                 />
               </label>
+              
               <button
                 type="submit"
-                className="w-full rounded-3xl bg-zinc-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
+                disabled={!canSaveLead}
+                className={`w-full rounded-3xl px-5 py-3 text-sm font-semibold transition ${
+                  canSaveLead
+                    ? "bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
+                    : "bg-zinc-200 text-zinc-400 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-600"
+                }`}
               >
-                Save Lead
+                {leadSaved ? "Lead Saved ✓" : "Save Lead"}
               </button>
             </form>
 
@@ -394,11 +396,6 @@ export default function AdiShilaChatbot() {
               <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
                 {leadPreview || "No lead captured yet."}
               </p>
-              {leadSaved && (
-                <p className="mt-3 rounded-2xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
-                  Lead saved to your browser. The bot will remember you!
-                </p>
-              )}
             </div>
           </div>
         </aside>
