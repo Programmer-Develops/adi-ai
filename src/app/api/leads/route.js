@@ -3,37 +3,40 @@ import { NextResponse } from "next/server";
 export async function POST(request) {
   try {
     const body = await request.json();
-    const lead = body.lead || body;
+    const lead = body.lead;
 
-    // Validate incoming data
-    if (!lead || (!lead.name && !lead.email && !lead.interest)) {
-      return NextResponse.json({ error: "Lead payload must include at least one contact field." }, { status: 400 });
+    // Basic validation to ensure the payload isn't completely empty
+    if (!lead || !lead.email || !lead.name) {
+      return NextResponse.json({ error: "Invalid lead payload. Name and Email are required." }, { status: 400 });
     }
 
-    const scriptUrl = process.env.LEAD_WEBHOOK_URL;
+    // Determine the correct Webhook based on the source
+    // If it comes from the new B2B portal, route it to the Task T12 Make.com workflow!
+    const isB2B = lead.source && lead.source.includes("B2B");
+    const webhookUrl = isB2B ? process.env.B2B_WEBHOOK_URL : process.env.LEAD_WEBHOOK_URL;
 
-    if (!scriptUrl) {
-      console.error("Missing LEAD_WEBHOOK_URL in environment variables.");
-      return NextResponse.json({ error: "Webhook URL not configured." }, { status: 500 });
+    if (!webhookUrl) {
+      console.error(`Missing ${isB2B ? 'B2B_WEBHOOK_URL' : 'LEAD_WEBHOOK_URL'} in environment variables.`);
+      return NextResponse.json({ error: "Webhook URL not configured on the server." }, { status: 500 });
     }
 
-    // Forward the lead data to the Google Sheets Apps Script Webhook
-    const response = await fetch(scriptUrl, {
+    // Forward the payload to your Webhook (Make.com, Zapier, or Google Sheets)
+    const response = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lead }),
     });
 
     if (!response.ok) {
-      throw new Error("Failed to forward lead to Google Sheets");
+      throw new Error(`Webhook responded with status: ${response.status}`);
     }
 
-    console.log("Lead successfully routed to Google Sheets:", lead.name);
+    console.log(`[B2B Portal] Lead successfully routed to Webhook: ${lead.name}`);
 
-    return NextResponse.json({ status: "ok", message: "Lead saved to Google Sheets" });
+    return NextResponse.json({ status: "ok", message: "Lead processed successfully" });
 
   } catch (err) {
-    console.error("Error in /api/leads saving to Sheets:", err);
+    console.error("Error in /api/leads backend:", err);
     return NextResponse.json({ error: "Failed to route lead." }, { status: 500 });
   }
 }

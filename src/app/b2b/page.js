@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Mail, User, ShieldCheck, TrendingUp, Sparkles, CheckCircle2, ArrowRight } from "lucide-react";
+import { Building2, Mail, User, ShieldCheck, TrendingUp, Sparkles, CheckCircle2, ArrowRight, Bug, AlertTriangle } from "lucide-react";
 
 const interestOptions = [
   "Kavach Shield OM",
@@ -14,8 +14,9 @@ const interestOptions = [
 
 export default function WholesalePortal() {
   const [formData, setFormData] = useState({ name: "", email: "", company: "", interest: [] });
-  const [status, setStatus] = useState("idle"); // idle, loading, success, error
+  const [status, setStatus] = useState("idle"); // idle, loading, success, error, edge_case_success
 
+  // Normal strict validation
   const isValid = 
     formData.name.trim().length >= 3 && 
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
@@ -31,14 +32,18 @@ export default function WholesalePortal() {
     }));
   };
 
+  // Standard Success Submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isValid) return;
     
     setStatus("loading");
     
-    // Formatting the array into a comma-separated string for the Webhook
-    const payload = { ...formData, interest: formData.interest.join(", ") };
+    const payload = { 
+      ...formData, 
+      interest: formData.interest.join(", "),
+      source: "B2B Wholesale Portal"
+    };
 
     try {
       const res = await fetch("/api/leads", {
@@ -49,6 +54,34 @@ export default function WholesalePortal() {
       
       if (!res.ok) throw new Error("Failed to submit");
       setStatus("success");
+    } catch (err) {
+      console.error(err);
+      setStatus("error");
+    }
+  };
+
+  // TASK T12 SPECIFIC: Simulate an edge case to trigger the Make.com error router
+  const handleEdgeCaseTest = async () => {
+    setStatus("loading");
+    
+    // Intentionally malformed payload (invalid email without .com)
+    const badPayload = { 
+      name: "Spam Bot 404", 
+      email: "spambot404@invalid", 
+      company: "Bot Network", 
+      interest: "Spam",
+      source: "B2B Edge Case"
+    };
+
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead: badPayload }),
+      });
+      
+      if (!res.ok) throw new Error("Failed to submit edge case");
+      setStatus("edge_case_success");
     } catch (err) {
       console.error(err);
       setStatus("error");
@@ -71,6 +104,29 @@ export default function WholesalePortal() {
             className="text-amber-500 hover:text-amber-400 text-sm font-medium transition-colors"
           >
             Submit another application
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // UI for the Spam Bot Edge Case Test
+  if (status === "edge_case_success") {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-zinc-900 border border-rose-900/50 rounded-3xl p-8 text-center animate-in zoom-in-95 duration-500">
+          <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-10 h-10 text-rose-500" />
+          </div>
+          <h2 className="text-2xl font-semibold text-white mb-2">Edge Case Triggered</h2>
+          <p className="text-zinc-400 mb-8 leading-relaxed">
+            A malformed payload (invalid email) was successfully forced through to the Webhook. Check your Make.com / Zapier logs to verify the Error Router successfully diverted this to the Quarantine sheet.
+          </p>
+          <button 
+            onClick={() => { setStatus("idle"); setFormData({ name: "", email: "", company: "", interest: [] }); }}
+            className="text-rose-500 hover:text-rose-400 text-sm font-medium transition-colors"
+          >
+            Return to Portal
           </button>
         </div>
       </div>
@@ -138,9 +194,11 @@ export default function WholesalePortal() {
       <div className="w-full md:w-7/12 lg:w-1/2 p-8 md:p-12 lg:p-20 bg-zinc-950 flex flex-col justify-center relative">
         <div className="max-w-xl mx-auto w-full">
           
-          <div className="mb-10">
-            <h2 className="text-2xl text-white font-medium mb-2">Partner Application</h2>
-            <p className="text-sm text-zinc-500">Submit your details to trigger our automated onboarding workflow.</p>
+          <div className="mb-10 flex items-start justify-between">
+            <div>
+              <h2 className="text-2xl text-white font-medium mb-2">Partner Application</h2>
+              <p className="text-sm text-zinc-500">Submit your details to trigger our automated onboarding workflow.</p>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -221,7 +279,7 @@ export default function WholesalePortal() {
               </div>
             )}
 
-            <div className="pt-6">
+            <div className="pt-6 flex flex-col gap-4">
               <button
                 type="submit"
                 disabled={!isValid || status === "loading"}
@@ -240,6 +298,24 @@ export default function WholesalePortal() {
             </div>
 
           </form>
+
+          {/* EVALUATOR / DEBUG MODE FOR TASK T12 */}
+          <div className="mt-12 pt-6 border-t border-zinc-800/50">
+             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+               <div>
+                 <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1">Task T12 Evaluator Tool</h4>
+                 <p className="text-xs text-zinc-500">Test the Make.com error-handling route (invalid payload).</p>
+               </div>
+               <button 
+                 onClick={handleEdgeCaseTest}
+                 className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-rose-900/30 hover:text-rose-400 border border-zinc-700 hover:border-rose-900 rounded-lg text-xs font-medium transition-colors shrink-0"
+               >
+                 <Bug className="w-3 h-3" />
+                 Simulate Spam Bot
+               </button>
+             </div>
+          </div>
+
         </div>
       </div>
     </div>
