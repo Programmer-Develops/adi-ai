@@ -97,7 +97,7 @@ export default function WholesalePortal() {
           </div>
           <h2 className="text-2xl font-semibold text-white mb-2">Application Received</h2>
           <p className="text-zinc-400 mb-8 leading-relaxed">
-            Thank you for your interest, {formData.name}. Our B2B sales team has been notified via Slack and your customized wholesale deck has been emailed to {formData.email}.
+            Thank you for your interest, {formData.name}. Our B2B sales team has been notified.
           </p>
           <button 
             onClick={() => { setStatus("idle"); setFormData({ name: "", email: "", company: "", interest: [] }); }}
